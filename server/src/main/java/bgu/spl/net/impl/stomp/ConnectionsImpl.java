@@ -91,10 +91,10 @@ public class ConnectionsImpl<T> implements Connections<T> {
         CopyOnWriteArrayList<ClientSub> subscribers = channelSubscribers.get(channel);
         if (subscribers != null) {
             // creating flag that indicates that we the user we want to remove exists
-            boolean removed = subscribers.removeIf(sub -> sub.ClientSubConnectionId == connectionId);
-            // if the client was successfully removed: // && sub.ClientSubscriptionId ==
-            // subscriptionId
-            if (removed) {
+            boolean removed = subscribers.removeIf(sub -> sub.ClientSubConnectionId == connectionId && sub.ClientSubscriptionId == subscriptionId)
+;
+            // if the client was successfully removed: 
+                if (removed) {
                 // remove from the client's channels list the specific channel that we removed
                 CopyOnWriteArrayList<String> userSubs = clientActiveSubscriptions.get(connectionId);
                 if (userSubs != null) {
@@ -103,8 +103,6 @@ public class ConnectionsImpl<T> implements Connections<T> {
             }
         }
     }
-
-
 
     private T createMessageFrame(int subscriptionId, String destination, String body) {
         String str = "MESSAGE\n" +
