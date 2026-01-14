@@ -34,15 +34,18 @@ public class StompFrame {
     public void setBody(String body) {
         this.body = body;
     }
-
+    
+    // parsing the message from string to Frame object
     public static StompFrame fromString(String msg) {
         String[] lines = msg.split("\n");
         if (lines.length == 0) {
             return null;
         }
+        // we know that the command is always the first line
         String command = lines[0];
         StompFrame frame = new StompFrame(command);
 
+        // finding the empty line that separates headers from body
         int emptyLineIdx = -1;
         for (int i = 1; i < lines.length; i++) {
             if (lines[i].isEmpty()) {
@@ -50,7 +53,8 @@ public class StompFrame {
                 break;
             }
         }
-    
+        
+        // finding where headers end
         int headersLimit;
         if (emptyLineIdx != -1) {
             headersLimit = emptyLineIdx;
@@ -58,6 +62,7 @@ public class StompFrame {
             headersLimit = lines.length;
         }
         
+        // parsing headers
         for (int i = 1; i < headersLimit; i++) {
             String line = lines[i];
             int split = line.indexOf(':');
@@ -67,7 +72,7 @@ public class StompFrame {
                 frame.addHeader(key, value);
             }
         }
-
+        // if there is a body parsing it
         if (emptyLineIdx != -1) {
             int bodyStart = msg.indexOf("\n\n") + 2;
             if (bodyStart < msg.length()) {
@@ -77,6 +82,7 @@ public class StompFrame {
         return frame;
     }
 
+    // converting the Frame object back to string
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(command).append("\n");

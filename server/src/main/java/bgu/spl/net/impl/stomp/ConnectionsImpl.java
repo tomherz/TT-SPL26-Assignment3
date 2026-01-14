@@ -105,13 +105,15 @@ public class ConnectionsImpl<T> implements Connections<T> {
     }
 
     private T createMessageFrame(int subscriptionId, String destination, String body) {
-        String str = "MESSAGE\n" +
-                "subscription:" + subscriptionId + "\n" +
-                "message-id:" + messageIdCounter.incrementAndGet() + "\n" +
-                "destination:" + destination + "\n" +
-                "\n" +
-                body;
-        return (T) (Object) str;
+        // creating new MESSAGE frame
+        StompFrame frame = new StompFrame("MESSAGE");
+        // expanding the frame with the relevant headers
+        frame.addHeader("subscription", String.valueOf(subscriptionId));
+        frame.addHeader("message-id", String.valueOf(messageIdCounter.incrementAndGet()));
+        frame.addHeader("destination", destination);
+        frame.setBody(body);
+        // returning the frame as T type
+        return (T) frame.toString();
     }
 
     private static class ClientSub {
