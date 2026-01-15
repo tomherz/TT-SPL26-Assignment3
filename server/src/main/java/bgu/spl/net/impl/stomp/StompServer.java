@@ -1,5 +1,6 @@
 package bgu.spl.net.impl.stomp;
 
+import bgu.spl.net.srv.BaseServer;
 import bgu.spl.net.srv.Server;
 
 public class StompServer {
@@ -16,9 +17,21 @@ public class StompServer {
 
 
         if(serverType.equals("tpc")){
-            Server.<String>threadPerClient(port, 
-                ()-> new StompMessagingProtocolImpl(),
-                ()-> new StompEncoderDecoder()).serve();
+            new BaseServer<String>(port,() -> new StompMessagingProtocolImpl(),() -> new StompEncoderDecoder(),null){
+                protected void execute(BlockingConnectionHandler<String> handler){
+                    new Thread(handler).start();
+                }
+            }.serve();
+        }
+
+        else if(serverType.equals("reactor")){
+            //choosing default number of threads, because we didnt get it in args
+            int numThreads = 5;
+            new Reactor<String>(numThreads, port, () -> new StompMessagingProtocolImpl(), () -> new StompEncoderDecoder(), null).serve();
+        }
+        else{
+            System.out.println("Unknown server type: " + serverType);
+            System.exit(1);
         }
     }
 }

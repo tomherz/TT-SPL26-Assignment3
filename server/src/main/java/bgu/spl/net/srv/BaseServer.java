@@ -14,10 +14,11 @@ public abstract class BaseServer<T> implements Server<T> {
 
     private final int port;
     private final Supplier<MessagingProtocol<T>> protocolFactory;
+    private final Supplier<StompMessagingProtocol<T>> stompFactory;
     private final Supplier<MessageEncoderDecoder<T>> encdecFactory;
     private ServerSocket sock;
 
-    private final ConnectionsImpl<T> connections;
+    private final ConnectionsImpl<T> connections = new ConnectionsImpl<>();
     private int connectionIdCounter = 0;
 
     public BaseServer(
@@ -27,9 +28,23 @@ public abstract class BaseServer<T> implements Server<T> {
 
         this.port = port;
         this.protocolFactory = protocolFactory;
+        this.stompFactory = null;
         this.encdecFactory = encdecFactory;
 		this.sock = null;
-        this.connections = new ConnectionsImpl<>();
+    }
+
+    public BaseServer(
+            int port,
+            Supplier<StompMessagingProtocol<T>> stompFactory,
+            Supplier<MessageEncoderDecoder<T>> encdecFactory, 
+            //adding a dummy parameter to differentiate constructors
+            Void ignore) {
+
+        this.port = port;
+        this.protocolFactory = null;
+        this.stompFactory = stompFactory;
+        this.encdecFactory = encdecFactory;
+		this.sock = null;
     }
 
     @Override
@@ -41,23 +56,24 @@ public abstract class BaseServer<T> implements Server<T> {
             this.sock = serverSock; //just to be able to close
 
             while (!Thread.currentThread().isInterrupted()) {
-
+                BlockingConnectionHandler<T> handler;
                 Socket clientSock = serverSock.accept();
-                // create a new protocol and encdec for the connection
-                MessagingProtocol<T> protocol = protocolFactory.get();
-                MessageEncoderDecoder<T> encdec = encdecFactory.get();
-                // create a unique connection ID
-                int connectionId = connectionIdCounter++;
-                // register the connection
-                if (protocol instanceof StompMessagingProtocol) {
-                    // start the protocol with the connection ID and connections, after casting to STOMP
-                    ((StompMessagingProtocol<T>) protocol).start(connectionId, connections);
-                }
-                // create the connection handler
-                BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<>(clientSock, encdec, protocol);
+                //checking which factory is not null to decide which protocol to create
+                if(stompFactory != null){
+                    StompMessagingProtocol<T> protocol = stompFactory.get();
+                    MessageEncoderDecoder<T> encdec = encdecFactory.get();
+                    int connectionId = connectionIdCounter++;
+                    //initialize the protocol with connectionId and connections
+                    protocol.start(connectionId, connections);
 
-                // connect the handler to connections
-                connections.connect(connectionId, handler);
+                    handler = new BlockingConnectionHandler<>(clientSock, encdec, protocol);
+                    connections.connect(connectionId, handler);
+                }
+                //else, use the regular protocol factory
+                else{
+                    handler = new BlockingConnectionHandler<>(clientSock, encdecFactory.get(), protocolFactory.get());
+                }
+                //now execute the right handler
                 execute(handler);
             }
         } catch (IOException ex) {
