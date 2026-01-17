@@ -2,6 +2,10 @@
 
 #include "../include/ConnectionHandler.h"
 #include "event.h"
+#include <string>
+#include <map>
+#include <vector>
+#include <mutex>
 
 using namespace std;
 
@@ -10,6 +14,7 @@ private:
     bool isConnected;
     int subscriptionIdCounter;
     int receiptIdCounter;
+    int disconnectReceiptId;
     
     // to keep track of the current user
     std::string currentUser;
@@ -17,6 +22,8 @@ private:
     std::map<std::string, int> topicToSubscriptionId;
     // data structure to hold games data
     std::map<std::string, std::map<std::string,vector<Event>>> gamesData;
+    // mutex for thread safety
+    std::mutex gamesDataMutex;
 
     void updateGameData(const std::string& topic, const std::string& user, const std::string& body);
     void saveSummaryToFile(const std::string& gameName, const std::string& user, const std::string& file);

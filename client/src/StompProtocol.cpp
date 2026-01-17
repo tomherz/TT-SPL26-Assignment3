@@ -8,9 +8,7 @@
 #include <iostream>
 #include <vector>
 
-static int disconnectReceiptId = -1;
-StompProtocol::StompProtocol() : isConnected(false), subscriptionIdCounter(0), receiptIdCounter(0), currentUser(""), topicToSubscriptionId(), gamesData() {}
-
+StompProtocol::StompProtocol() : isConnected(false), subscriptionIdCounter(0), receiptIdCounter(0), disconnectReceiptId(-1), currentUser(""), topicToSubscriptionId(), gamesData() {}
 bool StompProtocol::processInput(const std::string &line, ConnectionHandler &ConnectionHandler)
 {
     // parse the input line
@@ -247,21 +245,35 @@ bool StompProtocol::processServerResponse(std::string &frame)
     }
     else if (command == "RECEIPT")
     {
-        std::cout << "Receipt " << headers["receipt-id"] << " processed" << std::endl;
+        if (headers["receipt-id"] == std::to_string(disconnectReceiptId))
+        {
+            isConnected = false;
+            std::cout << "Logout successful" << std::endl;
+            return false;
+        }
+        else
+        {
+            std::cout << "Receipt " << headers["receipt-id"] << " processed" << std::endl;
+        }
     }
     else if (command == "MESSAGE")
     {
         std::cout << "MESSAGE from " << headers["destination"] << ":" << std::endl;
         std::cout << body << std::endl;
-        
+
         std::string user = "";
         std::string topic = headers["destination"];
         std::stringstream bodyStream(body);
         std::string line;
-        while (std::getline(bodyStream, line)){
+        while (std::getline(bodyStream, line))
+        {
             if (line.find("user:") == 0)
             {
                 line.erase(0, 5); // remove "user:" prefix
+                while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\n'))
+                {
+                    line.pop_back();
+                }
                 user = line;
                 break;
             }
@@ -278,11 +290,14 @@ bool StompProtocol::processServerResponse(std::string &frame)
 // Implementation to update game data based on the received message body
 void StompProtocol::updateGameData(const std::string &gameName, const std::string &user, const std::string &body)
 {
+    // lock the mutex for thread safety
+    std::lock_guard<std::mutex> lock(gamesDataMutex);
     // parse the body to create an Event object
     try
     {
         // create Event object
         Event event(body);
+        // insert the event into the data structure
         gamesData[gameName][user].push_back(event);
     }
     catch (const std::exception &e)
@@ -294,6 +309,8 @@ void StompProtocol::updateGameData(const std::string &gameName, const std::strin
 // Implementation to save game summary to a file
 void StompProtocol::saveSummaryToFile(const std::string &gameName, const std::string &user, const std::string &fileName)
 {
+    // lock the mutex for thread safety
+    std::lock_guard<std::mutex> lock(gamesDataMutex);
     // check if we have data for the requested game and user
     if (gamesData.find(gameName) == gamesData.end() ||
         gamesData[gameName].find(user) == gamesData[gameName].end())
@@ -358,7 +375,7 @@ void StompProtocol::saveSummaryToFile(const std::string &gameName, const std::st
     file << "Game event reports:\n";
     for (const auto &event : events)
     {
-        file << event.get_time() << ": " << event.get_name() << " - " << event.get_name() << ":\n\n";
+        file << event.get_time() << " - " << event.get_name() << ":\n\n";
         file << event.get_discription() << "\n\n\n";
     }
     file.close();
