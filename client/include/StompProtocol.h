@@ -37,13 +37,4 @@ public:
     // processes a single frame received from the server
     bool processServerResponse(std::string& frame);
 
-    std::string buildConnectFrame(string host, short port, string login, string passcode);
-
-    std::string buildSendFrame(string topic, string message);
-    
-    std::string buildSubscribeFrame(string topic, int id, int reciept);
-
-    std::string buildUnsubscribeFrame(int id, int reciept);
-
-    std::string buildDisconnectFrame(int reciept);
 };

@@ -32,11 +32,6 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
         // Extract port number, convert to short and convert to int
         short port = (short)stoi(hostPort.substr(colonPos + 1));
 
-        if (!ConnectionHandler.connect())
-        {
-            std::cout << "Could not connect to server" << std::endl;
-            return true;
-        }
         // build and send CONNECT frame
         std::string frame = StompEncoder::buildConnect(host, port, username, password);
         if (ConnectionHandler.sendFrameAscii(frame, '\0'))
