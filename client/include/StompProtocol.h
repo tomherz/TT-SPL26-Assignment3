@@ -1,25 +1,9 @@
 #pragma once
 
 #include "../include/ConnectionHandler.h"
+#include "event.h"
 
 using namespace std;
-
-// structure to hold the summary of a game
-struct GameSummary {
-    string team_a;
-    string team_b;
-    map<string, string> general_stats;
-    map<string, string> team_a_stats;
-    map<string, string> team_b_stats;
-
-// structure to hold individual event reports
-    struct EventReport {
-        string time;
-        string name;
-        string description;
-    };
-    vector<EventReport> reports;
-};
 
 class StompProtocol {
 private:
@@ -32,7 +16,7 @@ private:
     // creating map to keep track of subscriptions and receipts
     std::map<std::string, int> topicToSubscriptionId;
     // data structure to hold games data
-    std::map<std::string, std::map<std::string, GameSummary>> gamesData;
+    std::map<std::string, std::map<std::string,vector<Event>>> gamesData;
 
     void updateGameData(const std::string& topic, const std::string& user, const std::string& body);
     void saveSummaryToFile(const std::string& gameName, const std::string& user, const std::string& file);

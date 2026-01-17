@@ -13,10 +13,11 @@ StompProtocol::StompProtocol() : isConnected(false), subscriptionIdCounter(0), r
 
 bool StompProtocol::processInput(const std::string &line, ConnectionHandler &ConnectionHandler)
 {
+    // parse the input line
     std::stringstream ss(line);
     std::string command;
     ss >> command;
-
+    // process commands
     if (command == "login")
     {
         std::string hostPort, username, password;
@@ -38,7 +39,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             std::cout << "Could not connect to server" << std::endl;
             return true;
         }
-
+        // build and send CONNECT frame
         std::string frame = StompEncoder::buildConnect(host, port, username, password);
         if (ConnectionHandler.sendFrameAscii(frame, '\0'))
         {
@@ -58,11 +59,11 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             std::cout << "User is not logged in" << std::endl;
             return true;
         }
-
+        // generate subscription id and receipt id
         int subId = subscriptionIdCounter++;
         int receiptId = receiptIdCounter++;
         topicToSubscriptionId[topic] = subId;
-
+        // build and send SUBSCRIBE frame
         std::string frame = StompEncoder::buildSubscribe(topic, subId, receiptId);
         ConnectionHandler.sendFrameAscii(frame, '\0');
 
@@ -86,7 +87,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             std::cout << "User is not subscribed to channel " << topic << std::endl;
             return true;
         }
-
+        // generate receipt id
         int subId = topicToSubscriptionId[topic];
         int receiptId = receiptIdCounter++;
         topicToSubscriptionId.erase(topic);
@@ -114,6 +115,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
 
     else if (command == "report")
     {
+        // get the json file path
         std::string jsonFile;
         ss >> jsonFile;
 
@@ -122,7 +124,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             std::cout << "User is not logged in" << std::endl;
             return true;
         }
-
+        // parse the json file
         names_and_events parsedEvents;
         try
         {
@@ -133,7 +135,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             std::cout << "Failed to parse events file: " << e.what() << std::endl;
             return true;
         }
-
+        // for each event build and send a SEND frame
         for (const Event &event : parsedEvents.events)
         {
             std::stringstream body;
@@ -167,7 +169,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             ;
             std::string frame = StompEncoder::buildSend(topic, body.str());
             ConnectionHandler.sendFrameAscii(frame, '\0');
-
+            // update local game data
             updateGameData(topic, currentUser, body.str());
         }
         return true;
@@ -176,7 +178,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
     {
         std::string gameName, user, file;
         ss >> gameName >> user >> file;
-
+        // making sure we have data for the requested game and user
         if (gamesData.find(gameName) == gamesData.end() ||
             gamesData[gameName].find(user) == gamesData[gameName].end())
         {
@@ -184,6 +186,7 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
         }
         else
         {
+            // save the summary to file
             saveSummaryToFile(gameName, user, file);
         }
         return true;
@@ -192,17 +195,164 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
     std::cout << "Unknown command: " << command << std::endl;
     return true;
 }
+// helping method to process server responses
+bool StompProtocol::processServerResponse(std::string &frame)
+{
+    std::stringstream ss(frame);
+    std::string command;
+    std::getline(ss, command);
+    if (!command.empty() && command.back() == '\r')
+    {
+        command.pop_back();
+    }
+    // parse headers
+    std::map<std::string, std::string> headers;
+    std::string line;
+    while (std::getline(ss, line) && line != "\r" && line != "")
+    {
+        if (!line.empty() && line.back() == '\r')
+        {
+            line.pop_back();
+        }
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos)
+        {
+            std::string key = line.substr(0, colonPos);
+            std::string value = line.substr(colonPos + 1);
+            headers[key] = value;
+        }
+    }
+    // parse body
+    std::stringstream bodySS;
+    bodySS << ss.rdbuf();
+    std::string body = bodySS.str();
 
-bool StompProtocol::processServerResponse(std::string &frame) {
+    if (!body.empty() && body.back() == '\0')
+    {
+        body.pop_back();
+    }
+    // process commands
+    if (command == "CONNECTED")
+    {
+        isConnected = true;
+        std::cout << "Login successful" << std::endl;
+    }
+    else if (command == "ERROR")
+    {
+        std::cout << "Error from server: " << headers["message"] << std::endl;
+        if (!body.empty())
+        {
+            std::cout << body << std::endl;
+        }
+        isConnected = false;
+        return false;
+    }
+    else if (command == "RECEIPT")
+    {
+        std::cout << "Receipt " << headers["receipt-id"] << " processed" << std::endl;
+    }
+    else if (command == "MESSAGE")
+    {
+        std::cout << "MESSAGE from " << headers["destination"] << ":" << std::endl;
+        std::cout << body << std::endl;
 
+        std::string topic = headers["destination"];
+        std::string user = headers["user"];
+
+        if (!topic.empty() && !user.empty())
+        {
+            // update local game data
+            updateGameData(topic, user, body);
+        }
+    }
+    return true;
 }
 
 // Implementation to update game data based on the received message body
-void StompProtocol::updateGameData(const std::string& topic, const std::string& user, const std::string& body) {
-    
+void StompProtocol::updateGameData(const std::string &gameName, const std::string &user, const std::string &body)
+{
+    // parse the body to create an Event object
+    try
+    {
+        // create Event object
+        Event event(body);
+        gamesData[gameName][user].push_back(event);
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error parsing event body: " << e.what() << std::endl;
+    }
 }
 
 // Implementation to save game summary to a file
-void StompProtocol::saveSummaryToFile(const std::string& gameName, const std::string& user, const std::string& file) {
-    
+void StompProtocol::saveSummaryToFile(const std::string &gameName, const std::string &user, const std::string &fileName)
+{
+    // check if we have data for the requested game and user
+    if (gamesData.find(gameName) == gamesData.end() ||
+        gamesData[gameName].find(user) == gamesData[gameName].end())
+    {
+        std::cerr << "No data available for game " << gameName << " from user " << user << std::endl;
+        return;
+    }
+    const std::vector<Event> &events = gamesData[gameName][user];
+    if (events.empty())
+    {
+        return;
+    }
+
+    std::map<std::string, std::string> final_general_stats;
+    std::map<std::string, std::string> final_team_a_stats;
+    std::map<std::string, std::string> final_team_b_stats;
+    // aggregate final stats from all events
+    for (const auto &event : events)
+    {
+        for (const auto &update : event.get_game_updates())
+        {
+            final_general_stats[update.first] = update.second;
+        }
+        for (const auto &update : event.get_team_a_updates())
+        {
+            final_team_a_stats[update.first] = update.second;
+        }
+        for (const auto &update : event.get_team_b_updates())
+        {
+            final_team_b_stats[update.first] = update.second;
+        }
+    }
+    // write summary to file
+    std::ofstream file(fileName);
+    if (!file.is_open())
+    {
+        std::cerr << "Error opening file: " << fileName << std::endl;
+        return;
+    }
+
+    file << events[0].get_team_a_name() << " vs " << events[0].get_team_b_name() << "\n";
+    file << "Game stats:\n";
+
+    file << "General stats:\n";
+    for (const auto &stat : final_general_stats)
+    {
+        file << stat.first << ": " << stat.second << "\n";
+    }
+
+    file << events[0].get_team_a_name() << " stats:\n";
+    for (const auto &stat : final_team_a_stats)
+    {
+        file << stat.first << ": " << stat.second << "\n";
+    }
+
+    file << events[0].get_team_b_name() << " stats:\n";
+    for (const auto &stat : final_team_b_stats)
+    {
+        file << stat.first << ": " << stat.second << "\n";
+    }
+
+    file << "Game event reports:\n";
+    for (const auto &event : events)
+    {
+        file << event.get_time() << ": " << event.get_name() << " - " << event.get_name() << ":\n\n";
+        file << event.get_discription() << "\n\n\n";
+    }
+    file.close();
 }
