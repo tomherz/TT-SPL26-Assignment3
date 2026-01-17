@@ -169,8 +169,6 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
             ;
             std::string frame = StompEncoder::buildSend(topic, body.str());
             ConnectionHandler.sendFrameAscii(frame, '\0');
-            // update local game data
-            updateGameData(topic, currentUser, body.str());
         }
         return true;
     }
@@ -255,10 +253,19 @@ bool StompProtocol::processServerResponse(std::string &frame)
     {
         std::cout << "MESSAGE from " << headers["destination"] << ":" << std::endl;
         std::cout << body << std::endl;
-
+        
+        std::string user = "";
         std::string topic = headers["destination"];
-        std::string user = headers["user"];
-
+        std::stringstream bodyStream(body);
+        std::string line;
+        while (std::getline(bodyStream, line)){
+            if (line.find("user:") == 0)
+            {
+                line.erase(0, 5); // remove "user:" prefix
+                user = line;
+                break;
+            }
+        }
         if (!topic.empty() && !user.empty())
         {
             // update local game data
