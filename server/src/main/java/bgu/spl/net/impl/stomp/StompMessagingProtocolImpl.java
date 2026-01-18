@@ -131,6 +131,13 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
     }
 
     private void handleSend(StompFrame frame) {
+        // check who is the sender
+        String username = Database.getInstance().getUsername(connectionId);
+
+        if (username == null) {
+            sendError(frame, "Not logged in", "You must login before sending messages.");
+            return;
+        }
         // extracting headers
         String destination = frame.getHeader("destination");
         String body = frame.getBody();

@@ -23,12 +23,12 @@ public class Database {
 		this.sqlPort = 7778;
 	}
 
-	public static class DBHolder {
-		private static final Database db = new Database();
+	private static class Instance {
+		static final Database instance = new Database();
 	}
 
 	public static Database getInstance() {
-		return DBHolder.db;
+		return Instance.instance;
 	}
 
 	/**
@@ -39,8 +39,8 @@ public class Database {
 	 */
 	private String executeSQL(String sql) {
 		try (Socket socket = new Socket(sqlHost, sqlPort);
-				BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream());
-				BufferedInputStream in = new BufferedInputStream(socket.getInputStream())) {
+			BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream());
+			BufferedInputStream in = new BufferedInputStream(socket.getInputStream())) {
 
 			// Send SQL with null terminator
 			byte[] bytes = (sql + "\0").getBytes(StandardCharsets.UTF_8);
@@ -124,9 +124,13 @@ public class Database {
 	public void logout(int connectionsId) {
 		String username = activeLogins.remove(connectionsId);
 		if (username != null) {
-			String safeUser = executeSQL(username);
+			String safeUser = escapeSql(username);
 			executeSQL("UPDATE Logins SET logout_time=datetime('now') WHERE username='" + safeUser + "'AND logout_time IS NULL");
 		}
+	}
+
+	public String getUsername(int connectionId) {
+		return activeLogins.get(connectionId);
 	}
 
 	/**
@@ -138,7 +142,7 @@ public class Database {
 	 */
 	public void trackFileUpload(String username, String filename, String gameChannel) {
 		String sql = String.format(
-				"INSERT INTO file_tracking (username, filename, upload_time, game_channel) " +
+				"INSERT INTO Files (username, filename, upload_time, game_channel) " +
 						"VALUES ('%s', '%s', datetime('now'), '%s')",
 				escapeSql(username), escapeSql(filename), escapeSql(gameChannel));
 		executeSQL(sql);
@@ -155,72 +159,23 @@ public class Database {
 		// List all users
 		System.out.println("\n1. REGISTERED USERS:");
 		System.out.println(repeat("-", 80));
-		String usersSQL = "SELECT username, registration_date FROM users ORDER BY registration_date";
-		String usersResult = executeSQL(usersSQL);
-		if (usersResult.startsWith("SUCCESS")) {
-			String[] parts = usersResult.split("\\|");
-			if (parts.length > 1) {
-				for (int i = 1; i < parts.length; i++) {
-					System.out.println("   " + parts[i]);
-				}
-			} else {
-				System.out.println("   No users registered");
-			}
-		}
+		System.out.println(executeSQL("SELECT username, password FROM Users"));
 
+		// Logged in users
+		System.out.println("\n2. ACTIVE LOGINS (Memory):");
+		System.out.println(repeat("-", 80));
+		activeLogins.forEach((id, user) -> System.out.println("	ID: " + id + "User: " + user));
+		
 		// Login history for each user
-		System.out.println("\n2. LOGIN HISTORY:");
+		System.out.println("\n3. LOGIN HISTORY:");
 		System.out.println(repeat("-", 80));
-		String loginSQL = "SELECT username, login_time, logout_time FROM Logins ORDER BY username, login_time DESC";
-		String loginResult = executeSQL(loginSQL);
-		if (loginResult.startsWith("SUCCESS")) {
-			String[] parts = loginResult.split("\\|");
-			if (parts.length > 1) {
-				String currentUser = "";
-				for (int i = 1; i < parts.length; i++) {
-					String[] fields = parts[i].replace("(", "").replace(")", "").replace("'", "").split(", ");
-					if (fields.length >= 3) {
-						if (!fields[0].equals(currentUser)) {
-							currentUser = fields[0];
-							System.out.println("\n   User: " + currentUser);
-						}
-						System.out.println("      Login:  " + fields[1]);
-						System.out
-								.println("      Logout: " + (fields[2].equals("None") ? "Still logged in" : fields[2]));
-					}
-				}
-			} else {
-				System.out.println("   No login history");
-			}
-		}
-
-		// File uploads for each user
-		System.out.println("\n3. FILE UPLOADS:");
+		System.out.println(executeSQL("SELECT username, login_time, logout_time FROM Logins"));
+		
+		// Uploaded files
+		System.out.println("\n4. FILE UPLOADS:");
 		System.out.println(repeat("-", 80));
-		String filesSQL = "SELECT username, filename, upload_time, game_channel FROM file_tracking ORDER BY username, upload_time DESC";
-		String filesResult = executeSQL(filesSQL);
-		if (filesResult.startsWith("SUCCESS")) {
-			String[] parts = filesResult.split("\\|");
-			if (parts.length > 1) {
-				String currentUser = "";
-				for (int i = 1; i < parts.length; i++) {
-					String[] fields = parts[i].replace("(", "").replace(")", "").replace("'", "").split(", ");
-					if (fields.length >= 4) {
-						if (!fields[0].equals(currentUser)) {
-							currentUser = fields[0];
-							System.out.println("\n   User: " + currentUser);
-						}
-						System.out.println("      File: " + fields[1]);
-						System.out.println("      Time: " + fields[2]);
-						System.out.println("      Game: " + fields[3]);
-						System.out.println();
-					}
-				}
-			} else {
-				System.out.println("   No files uploaded");
-			}
-		}
-
+		System.out.println(executeSQL("SELECT username, filename, game_channel FROM Files"));
+		
 		System.out.println(repeat("=", 80));
 	}
 
@@ -230,9 +185,5 @@ public class Database {
 			sb.append(str);
 		}
 		return sb.toString();
-	}
-
-	private static class Instance {
-		static Database instance = new Database();
 	}
 }
