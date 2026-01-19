@@ -73,7 +73,7 @@ public class ConnectionsImpl<T> implements Connections<T> {
         CopyOnWriteArrayList<ClientSub> subscribers = channelSubscribers.get(channel);
         // checking if the client is already subscribed to the channel, if so return
         for (ClientSub sub : subscribers) {
-            if (sub.ClientSubConnectionId == connectionId) {
+            if (sub.ClientSubConnectionId == connectionId && sub.ClientSubscriptionId == subscriptionId) {
                 return;
             }
         }
