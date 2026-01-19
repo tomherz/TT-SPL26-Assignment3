@@ -156,7 +156,7 @@ def start_server(host="127.0.0.1", port=7778):
     
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
+    
     try:
         server_socket.bind((host, port))
         server_socket.listen(5)

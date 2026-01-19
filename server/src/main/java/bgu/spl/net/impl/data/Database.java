@@ -38,6 +38,7 @@ public class Database {
 	 * @return Result string from SQL server
 	 */
 	private String executeSQL(String sql) {
+		// Connect to SQL server
 		try (Socket socket = new Socket(sqlHost, sqlPort);
 			BufferedOutputStream out = new BufferedOutputStream(socket.getOutputStream());
 			BufferedInputStream in = new BufferedInputStream(socket.getInputStream())) {
@@ -56,7 +57,7 @@ public class Database {
 				}
 				buffer.write(readByte);
 			}
-
+			//return response from the byte array
 			return new String(buffer.toByteArray(), StandardCharsets.UTF_8);
 
 		} catch (IOException e) {
@@ -73,7 +74,7 @@ public class Database {
 			return "";
 		return str.replace("'", "''");
 	}
-
+	// login status number codes
 	public synchronized LoginStatus login(int connectionId, String username, String password) {
 		if (activeLogins.containsValue(username)) {
 			return LoginStatus.ALREADY_LOGGED_IN;
@@ -85,22 +86,22 @@ public class Database {
 
 		return userExistsCase(connectionId, username, password);
 	}
-
+	// log user login time in the database
 	private void logLogin(String username) {
 		String safeUser = escapeSql(username);
 		String sql = "INSERT INTO Logins (username, login_time) VALUES ('" + safeUser + "', datetime('now'))";
 		executeSQL(sql);
 	}
-
+	// complete login process
 	private void completeLogin(int connectionId, String username) {
 		activeLogins.put(connectionId, username);
 		logLogin(username);
 	}
-
+	// handle existing user login case
 	private LoginStatus userExistsCase(int connectionId, String username, String password) {
 		String safeUser = escapeSql(username);
 		String existingPassword = executeSQL("SELECT password FROM Users WHERE username='" + safeUser + "'");
-
+		// check password match
 		if (existingPassword != null && existingPassword.trim().equals(password)) {
 			completeLogin(connectionId, username);
 			return LoginStatus.LOGGED_IN_SUCCESSFULLY;
@@ -111,6 +112,7 @@ public class Database {
 	private boolean addNewUserCase(int connectionId, String username, String password) {
 		String safeUser = escapeSql(username);
 		String existingPassword = executeSQL("SELECT password FROM Users WHERE username='" + safeUser + "'");
+		// add new user if not exists
 		if (existingPassword == null || existingPassword.isEmpty()) {
 			String safePass = escapeSql(password);
 			executeSQL("INSERT INTO Users (username, password) VALUES ('" + safeUser + "', '" + safePass + "')");
@@ -120,15 +122,16 @@ public class Database {
 		}
 		return false;
 	}
-
+	// log user logout time in the database
 	public void logout(int connectionsId) {
 		String username = activeLogins.remove(connectionsId);
 		if (username != null) {
 			String safeUser = escapeSql(username);
+			// update logout time
 			executeSQL("UPDATE Logins SET logout_time=datetime('now') WHERE username='" + safeUser + "'AND logout_time IS NULL");
 		}
 	}
-
+	// get username by connection id
 	public String getUsername(int connectionId) {
 		return activeLogins.get(connectionId);
 	}
