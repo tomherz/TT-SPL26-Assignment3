@@ -30,7 +30,8 @@ int main(int argc, char *argv[])
 							 {
 		while (isRunning){
 			std::string answer;
-			if (!connectionHandler.getLine(answer)) {
+			
+			if (!connectionHandler.getFrameAscii(answer, '\0')) {
 				std::cout << "Disconnected from server. Press entere to exit." << std::endl;
 				isRunning = false;
 				break;

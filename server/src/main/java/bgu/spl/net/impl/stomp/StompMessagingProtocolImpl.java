@@ -1,6 +1,5 @@
 package bgu.spl.net.impl.stomp;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import bgu.spl.net.srv.Connections;
@@ -102,7 +101,11 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             return;
         }
         int subscriptionId = Integer.parseInt(idStr);
-        // adding the subscription
+        // adding the subscription if not already exists
+        if(activeSubscriptions.containsKey(subscriptionId)){
+            sendError(frame,"Error", "Subscription ID " + subscriptionId + "already exists.");
+            return;
+        }
         activeSubscriptions.put(subscriptionId, destination);
         connections.subscribe(destination, connectionId, subscriptionId);
 
