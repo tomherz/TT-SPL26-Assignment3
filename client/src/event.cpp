@@ -74,6 +74,9 @@ Event::Event(const std::string &frame_body) : team_a_name(""), team_b_name(""), 
         
         if (line.empty()) continue;
 
+        if(line.find("user:")==0){
+            continue;
+        }
         if (line == "general game updates:") {
             current_section = "game_updates";
             continue;
