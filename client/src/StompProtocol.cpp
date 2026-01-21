@@ -9,6 +9,15 @@
 #include <vector>
 #include <algorithm>
 
+std::string trim(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\r\n");
+    if (std::string::npos == first) {
+        return "";
+    }
+    size_t last = str.find_last_not_of(" \t\r\n");
+    return str.substr(first, (last - first + 1));
+}
+
 StompProtocol::StompProtocol() : isConnected(false), subscriptionIdCounter(0), receiptIdCounter(0), disconnectReceiptId(-1), currentUser(""), topicToSubscriptionId(), gamesData() {}
 bool StompProtocol::processInput(const std::string &line, ConnectionHandler &ConnectionHandler)
 {
@@ -184,10 +193,7 @@ bool StompProtocol::processServerResponse(std::string &frame)
     std::stringstream ss(frame);
     std::string command;
     std::getline(ss, command);
-    if (!command.empty() && command.back() == '\r')
-    {
-        command.pop_back();
-    }
+    command = trim(command);
     // parse headers
     std::map<std::string, std::string> headers;
     std::string line;
@@ -200,8 +206,8 @@ bool StompProtocol::processServerResponse(std::string &frame)
         size_t colonPos = line.find(':');
         if (colonPos != std::string::npos)
         {
-            std::string key = line.substr(0, colonPos);
-            std::string value = line.substr(colonPos + 1);
+            std::string key = trim(line.substr(0, colonPos));
+            std::string value = trim(line.substr(colonPos + 1));
             headers[key] = value;
         }
     }
@@ -214,6 +220,7 @@ bool StompProtocol::processServerResponse(std::string &frame)
     {
         body.pop_back();
     }
+
     // process commands
     if (command == "CONNECTED")
     {
@@ -245,20 +252,23 @@ bool StompProtocol::processServerResponse(std::string &frame)
     }
     else if (command == "MESSAGE")
     {
-        std::cout << "MESSAGE from " << headers["destination"] << ":" << std::endl;
-        std::cout << body << std::endl;
-
         std::string user = "";
-        if (headers.count("user")) {
-            user = headers["user"];
+        std::string topic = "";
+
+        if (headers.count("user")) user = headers["user"];
+        if (headers.count("destination")) topic = headers["destination"];
+
+        if (!topic.empty() && topic[0] == '/') {
+            topic = topic.substr(1);
         }
-        
-        std::string topic = headers["destination"];    
-        
+          
         if (!topic.empty() && !user.empty()) {
             // update local game data
             updateGameData(topic, user, body);
         }
+     
+        std::cout << "MESSAGE from " << topic << ":" << std::endl;
+        std::cout << body << std::endl;
     }
     return true;
 }
@@ -362,7 +372,7 @@ void StompProtocol::saveSummaryToFile(const std::string &gameName, const std::st
     for (const auto &event : events)
     {
         file << event.get_time() << " - " << event.get_name() << ":\n\n";
-        file << event.get_discription() << "\n\n\n";
+        file << event.get_discription() << "\n\n";
     }
     file.close();
 }

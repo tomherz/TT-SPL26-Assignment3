@@ -22,7 +22,7 @@ public:
     static string buildSubscribe(const string &topic, int id, int receipt)
     {
         return "SUBSCRIBE\n"
-               "destination:/" +
+               "destination:" +
                topic + "\n"
                        "id:" +
                to_string(id) + "\n"
@@ -44,7 +44,7 @@ public:
     static string buildSend(const string &topic, const string &msg)
     {
         return "SEND\n"
-               "destination:/" +
+               "destination:" +
                topic + "\n"
                        "\n" +
                msg + "\n";

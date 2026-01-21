@@ -36,10 +36,25 @@ public class ConnectionsImpl<T> implements Connections<T> {
         if (subscribers == null) {
             return;
         }
-        String body = (String) msg;
+        String fullMsg = (String) msg;
+        String senderUsername = null;
+        String actualBody = fullMsg;
+
+        int splitIndex = fullMsg.indexOf("@@@@@");
+
+        if (splitIndex != -1) {
+            senderUsername = fullMsg.substring(0, splitIndex);
+
+            if (splitIndex + 5 < fullMsg.length()) {
+                actualBody = fullMsg.substring(splitIndex + 5);
+            }
+            else {
+                actualBody = "";
+            }
+        }
 
         for (ClientSub sub : subscribers) {
-            T messageFrame = createMessageFrame(sub.ClientSubscriptionId, channel, body);
+            T messageFrame = createMessageFrame(sub.ClientSubscriptionId, channel, actualBody, senderUsername);
             send(sub.ClientSubConnectionId, messageFrame);
         }
     }
@@ -104,13 +119,15 @@ public class ConnectionsImpl<T> implements Connections<T> {
         }
     }
 
-    private T createMessageFrame(int subscriptionId, String destination, String body) {
+    private T createMessageFrame(int subscriptionId, String destination, String body, String user) {
         // creating new MESSAGE frame
         StompFrame frame = new StompFrame("MESSAGE");
         // expanding the frame with the relevant headers
         frame.addHeader("subscription", String.valueOf(subscriptionId));
         frame.addHeader("message-id", String.valueOf(messageIdCounter.incrementAndGet()));
         frame.addHeader("destination", destination);
+        frame.addHeader("user", user);
+        
         frame.setBody(body);
         // returning the frame as T type
         return (T) frame.toString();

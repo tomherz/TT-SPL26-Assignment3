@@ -8,6 +8,15 @@
 #include <sstream>
 using json = nlohmann::json;
 
+std::string trim_event_str(const std::string& str) {
+    size_t first = str.find_first_not_of(" \t\r\n");
+    if (std::string::npos == first) {
+        return "";
+    }
+    size_t last = str.find_last_not_of(" \t\r\n");
+    return str.substr(first, (last - first + 1));
+}
+
 Event::Event(std::string team_a_name, std::string team_b_name, std::string name, int time,
              std::map<std::string, std::string> game_updates, std::map<std::string, std::string> team_a_updates,
              std::map<std::string, std::string> team_b_updates, std::string discription)
@@ -74,9 +83,6 @@ Event::Event(const std::string &frame_body) : team_a_name(""), team_b_name(""), 
         
         if (line.empty()) continue;
 
-        if(line.find("user:")==0){
-            continue;
-        }
         if (line == "general game updates:") {
             current_section = "game_updates";
             continue;
@@ -86,11 +92,14 @@ Event::Event(const std::string &frame_body) : team_a_name(""), team_b_name(""), 
         } else if (line == "team b updates:") {
             current_section = "team_b_updates";
             continue;
-        } else if (line == "description:") {
+        }
+          else if (line.find("description") == 0) {
             current_section = "description";
+            if (line.length() > 12) {
+                description += line.substr(12) + "\n";
+            }
             continue;
         }
-
         if (current_section == "description") {
             description += line + "\n";
             continue;
@@ -98,8 +107,8 @@ Event::Event(const std::string &frame_body) : team_a_name(""), team_b_name(""), 
 
         size_t colonPos = line.find(':');
         if (colonPos != std::string::npos) {
-            std::string key = line.substr(0, colonPos);
-            std::string value = line.substr(colonPos + 1);
+            std::string key = trim_event_str(line.substr(0, colonPos));
+            std::string value = trim_event_str(line.substr(colonPos + 1));
 
             if (value.length() > 0 && value[0] == ' ') {
                 value = value.substr(1);

@@ -2,6 +2,7 @@ package bgu.spl.net.impl.stomp;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.UUID;
 import bgu.spl.net.srv.Connections;
 
 import bgu.spl.net.api.StompMessagingProtocol;
@@ -150,7 +151,7 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             return;
         }
         // preparing the new body with the username
-        String newbody = "user: " + username + "\n" + body;
+        String newbody = username + "@@@@@" + body;
         // sending the message to all subscribers
         connections.send(destination, newbody);
         handleReceipt(frame);
