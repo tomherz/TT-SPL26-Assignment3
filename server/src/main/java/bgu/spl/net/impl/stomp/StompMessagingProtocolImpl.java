@@ -149,8 +149,16 @@ public class StompMessagingProtocolImpl implements StompMessagingProtocol<String
             sendError(frame, "Missing Headers", "SEND frame must contain destination header.");
             return;
         }
+
+        StompFrame messageFrame = new StompFrame("MESSAGE");
+        messageFrame.addHeader("destination", destination);
+        messageFrame.addHeader("message-id", java.util.UUID.randomUUID().toString());
+        messageFrame.addHeader("subscription", "0");
+
+        messageFrame.addHeader("user", username);
+        messageFrame.setBody(body);
         // sending the message to all subscribers
-        connections.send(destination, body);
+        connections.send(destination, messageFrame.toString());
         handleReceipt(frame);
     }
 

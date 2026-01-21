@@ -170,17 +170,8 @@ bool StompProtocol::processInput(const std::string &line, ConnectionHandler &Con
     {
         std::string gameName, user, file;
         ss >> gameName >> user >> file;
-        // making sure we have data for the requested game and user
-        if (gamesData.find(gameName) == gamesData.end() ||
-            gamesData[gameName].find(user) == gamesData[gameName].end())
-        {
-            std::cout << "No data available for game " << gameName << " from user " << user << std::endl;
-        }
-        else
-        {
-            // save the summary to file
-            saveSummaryToFile(gameName, user, file);
-        }
+        // save the summary to file
+        saveSummaryToFile(gameName, user, file);
         return true;
     }
 
@@ -258,24 +249,13 @@ bool StompProtocol::processServerResponse(std::string &frame)
         std::cout << body << std::endl;
 
         std::string user = "";
-        std::string topic = headers["destination"];
-        std::stringstream bodyStream(body);
-        std::string line;
-        while (std::getline(bodyStream, line))
-        {
-            if (line.find("user:") == 0)
-            {
-                line.erase(0, 5); // remove "user:" prefix
-                while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\n'))
-                {
-                    line.pop_back();
-                }
-                user = line;
-                break;
-            }
+        if (headers.count("user")) {
+            user = headers["user"];
         }
-        if (!topic.empty() && !user.empty())
-        {
+        
+        std::string topic = headers["destination"];    
+        
+        if (!topic.empty() && !user.empty()) {
             // update local game data
             updateGameData(topic, user, body);
         }
