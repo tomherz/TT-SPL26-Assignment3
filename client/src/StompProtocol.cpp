@@ -7,6 +7,7 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 StompProtocol::StompProtocol() : isConnected(false), subscriptionIdCounter(0), receiptIdCounter(0), disconnectReceiptId(-1), currentUser(""), topicToSubscriptionId(), gamesData() {}
 bool StompProtocol::processInput(const std::string &line, ConnectionHandler &ConnectionHandler)
@@ -292,8 +293,18 @@ void StompProtocol::updateGameData(const std::string &gameName, const std::strin
     {
         // create Event object
         Event event(body);
-        // insert the event into the data structure
-        gamesData[gameName][user].push_back(event);
+        // insert event into the correct position in the user's event vector
+        std::vector<Event>& userEvents = gamesData[gameName][user];
+        if(userEvents.empty()){
+            userEvents.push_back(event);
+        }
+        else{
+            //insert while maintaining sorted order by event time
+            std::vector<Event>::iterator it = std::upper_bound(userEvents.begin(), userEvents.end(), event, [](const Event& a, const Event& b){
+                return a.get_time() < b.get_time();
+            });
+            userEvents.insert(it, event);
+        }
     }
     catch (const std::exception &e)
     {
